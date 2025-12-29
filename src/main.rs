@@ -1,4 +1,5 @@
 #![allow(static_mut_refs)]
+#![allow(non_upper_case_globals)]
 use sdl2_sys as sdl;
 use std::ffi::CString;
 use std::env;
@@ -72,7 +73,6 @@ static mut frame_buffer:[u16; 61440] = [0; 61440]; // 256x240 pixel frame buffer
                          // are not drawn.
 
 static mut shift_at: u32 = 0;
-static mut abc: u32 = 1;
 
 fn pull() -> u8 {
     unsafe {
