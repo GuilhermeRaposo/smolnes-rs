@@ -6,71 +6,70 @@ use std::env;
 use std::os::raw::c_void;
 
 static mut rom: *const u8 = std::ptr::null();
-static mut chrrom: *mut u8 = std::ptr::null_mut();                // Points to the start of PRG/CHR ROM
+static mut chrrom: *mut u8 = std::ptr::null_mut();  // Points to the start of PRG/CHR ROM
 static mut prg:[u8; 4] = [0; 4];
-static mut chr:[u8; 8] = [0; 8];             // Current PRG/CHR banks
+static mut chr:[u8; 8] = [0; 8];                    // Current PRG/CHR banks
 static mut prgbits: u8 = 14;
-static mut chrbits: u8 = 12;       // Number of bits per PRG/CHR bank
+static mut chrbits: u8 = 12;                        // Number of bits per PRG/CHR bank
 static mut A: u8 = 0;
 static mut X: u8 = 0;
 static mut Y: u8 = 0;
 static mut P: u8 = 4;
 static mut S: u8 = 0xFD;
 static mut PCH: u8 = 0;
-static mut PCL: u8 = 0; // CPU Registers
+static mut PCL: u8 = 0;                             // CPU Registers
 static mut addr_lo: u8 = 0;
-static mut addr_hi: u8 = 0;                 // Current instruction address
-static mut nomem: u8 = 0;  // 1 => current instruction doesn't write to memory
-static mut result: u8 = 0; // Temp variable
-static mut val: u8 = 0;    // Current instruction value
-static mut cross: u8 = 0;  // 1 => page crossing occurred
-static mut tmp: u8 = 0;    // Temp variables
+static mut addr_hi: u8 = 0;                         // Current instruction address
+static mut nomem: u8 = 0;                           // 1 => current instruction doesn't write to memory
+static mut result: u8 = 0;                          // Temp variable
+static mut val: u8 = 0;                             // Current instruction value
+static mut cross: u8 = 0;                           // 1 => page crossing occurred
+static mut tmp: u8 = 0;                             // Temp variables
 static mut ppumask: u8 = 0;
 static mut ppuctrl: u8 = 0;
-static mut ppustatus: u8 = 0; // PPU registers
-static mut ppubuf: u8 = 0;                      // PPU buffered reads
-static mut W: u8 = 0;                           // Write toggle PPU register
-static mut fine_x: u8 = 0;                      // X fine scroll offset, 0..7
-static mut opcode: u8 = 0;                      // Current instruction opcode
-static mut nmi_irq: u8 = 0;              // 1 => IRQ occurred
-                                 // 4 => NMI occurred
-static mut ntb: u8 = 0;                         // Nametable byte
-static mut ptb_lo: u8 = 0;                     // Pattern table lowbyte
+static mut ppustatus: u8 = 0;                       // PPU registers
+static mut ppubuf: u8 = 0;                          // PPU buffered reads
+static mut W: u8 = 0;                               // Write toggle PPU register
+static mut fine_x: u8 = 0;                          // X fine scroll offset, 0..7
+static mut opcode: u8 = 0;                          // Current instruction opcode
+static mut nmi_irq: u8 = 0;                         // 1 => IRQ occurred
+                                                    // 4 => NMI occurred
+static mut ntb: u8 = 0;                             // Nametable byte
+static mut ptb_lo: u8 = 0;                          // Pattern table lowbyte
 static mut vram:[u8; 2048] = [0; 2048];             // Nametable RAM
-static mut palette_ram:[u8; 64] = [0; 64];            // Palette RAM
-static mut ram:[u8; 8192] = [0; 8192];                   // CPU RAM
-static mut chrram:[u8; 8192] = [0; 8192];                // CHR RAM (only used for some games)
-static mut prgram:[u8; 8192] = [0; 8192];                // PRG RAM (only used for some games)
-static mut oam:[u8; 256] = [0; 256];                    // Object Attribute Memory (sprite RAM)
-static mut mask:[u8; 20] = [128, 64, 1, 2,     // Masks used in branch instructions
+static mut palette_ram:[u8; 64] = [0; 64];          // Palette RAM
+static mut ram:[u8; 8192] = [0; 8192];              // CPU RAM
+static mut chrram:[u8; 8192] = [0; 8192];           // CHR RAM (only used for some games)
+static mut prgram:[u8; 8192] = [0; 8192];           // PRG RAM (only used for some games)
+static mut oam:[u8; 256] = [0; 256];                // Object Attribute Memory (sprite RAM)
+static mut mask:[u8; 20] = [128, 64, 1, 2,          // Masks used in branch instructions
                             1,   0,  0, 1, 4, 0, 0, 4, 0,
-                            0,   64, 0, 8, 0, 0, 8]; // Masks used in SE*/CL* instructions.
-static mut keys: u8 = 0;                              // Joypad shift register
-static mut mirror: u8 = 0;                            // Current mirroring mode
+                            0,   64, 0, 8, 0, 0, 8];// Masks used in SE*/CL* instructions.
+static mut keys: u8 = 0;                            // Joypad shift register
+static mut mirror: u8 = 0;                          // Current mirroring mode
 static mut mmc1_bits: u8 = 0;
 static mut mmc1_data: u8 = 0;
-static mut mmc1_ctrl: u8 = 0;   // Mapper 1 (MMC1) registers
+static mut mmc1_ctrl: u8 = 0;                       // Mapper 1 (MMC1) registers
 static mut mmc3_chrprg:[u8; 8] = [0; 8];
-static mut mmc3_bits: u8 = 0;         // Mapper 4 (MMC3) registers
+static mut mmc3_bits: u8 = 0;                       // Mapper 4 (MMC3) registers
 static mut mmc3_irq: u8 = 0;
-static mut mmc3_latch: u8 = 0;              //
+static mut mmc3_latch: u8 = 0;                      
 static mut chrbank0: u8 = 0;
 static mut chrbank1: u8 = 0;
-static mut prgbank: u8 = 0;       // Current PRG/CHR bank
-static mut rombuf:[u8; 1024 * 1024] = [0; 1024 * 1024];               // Buffer to read ROM file into
+static mut prgbank: u8 = 0;                         // Current PRG/CHR bank
+static mut rombuf:[u8; 1024 * 1024] = [0; 1024 * 1024];// Buffer to read ROM file into
 static mut key_state: *mut u8 = std::ptr::null_mut();
 
-static mut scany: u16 = 0;          // Scanline Y
+static mut scany: u16 = 0;                          // Scanline Y
 static mut T: u16 = 0;
-static mut V: u16 = 0;                // "Loopy" PPU registers
-static mut sum: u16 = 0;                 // Sum used for ADC/SBC
-static mut dot: u16 = 0;                 // Horizontal position of PPU, from 0..340
-static mut atb: u16 = 0;                 // Attribute byte
+static mut V: u16 = 0;                              // "Loopy" PPU registers
+static mut sum: u16 = 0;                            // Sum used for ADC/SBC
+static mut dot: u16 = 0;                            // Horizontal position of PPU, from 0..340
+static mut atb: u16 = 0;                            // Attribute byte
 static mut shift_hi: u16 = 0;
-static mut shift_lo: u16 = 0;  // Pattern table shift registers
-static mut cycles: u16 = 0;              // Cycle count for current instruction
-static mut frame_buffer:[u16; 61440] = [0; 61440]; // 256x240 pixel frame buffer. Top and bottom 8 rows
-                         // are not drawn.
+static mut shift_lo: u16 = 0;                       // Pattern table shift registers
+static mut cycles: u16 = 0;                         // Cycle count for current instruction
+static mut frame_buffer:[u16; 61440] = [0; 61440]; // 256x240 pixel frame buffer. Top and bottom 8 rows are not drawn.
 
 static mut shift_at: u32 = 0;
 
@@ -569,7 +568,6 @@ fn main() {
             panic!("Usage: cargo run <rom.nes>");
         }
 
-        // Convert Rust string to C string
         let c_filename = CString::new(args[1].as_str()).unwrap();
         let rw = sdl::SDL_RWFromFile(c_filename.as_ptr(), CString::new("rb").unwrap().as_ptr());
         if rw.is_null() {
