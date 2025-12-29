@@ -1,21 +1,6 @@
 #![allow(static_mut_refs)]
-use sdl2_sys::SDL_CreateRenderer;
-use sdl2_sys::SDL_CreateTexture;
-use sdl2_sys::SDL_CreateWindow;
-use sdl2_sys::SDL_Scancode;
-use sdl2_sys::SDL_RWread;
-use sdl2_sys::SDL_RWFromFile;
-use sdl2_sys::SDL_INIT_VIDEO;
-use sdl2_sys::SDL_WindowFlags::SDL_WINDOW_SHOWN;
-use sdl2_sys::SDL_PixelFormatEnum::SDL_PIXELFORMAT_BGR565;
-use sdl2_sys::SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING;
-use sdl2_sys::SDL_RendererFlags::SDL_RENDERER_PRESENTVSYNC;
-use sdl2_sys::SDL_UpdateTexture;
-use sdl2_sys::SDL_RenderCopy;
-use sdl2_sys::SDL_RenderPresent;
-use sdl2_sys::SDL_PollEvent;
-use sdl2_sys::SDL_Event;
-use sdl2_sys::SDL_EventType::SDL_QUIT;
+use sdl2_sys as sdl;
+use std::ffi::CString;
 use std::env;
 use std::os::raw::c_void;
 
@@ -248,14 +233,14 @@ fn mem(mut lo: u8, mut hi: u8, _val: u8, write: u8) -> u8 {
                     hi -= 1;
                     tmp = tmp * 2 +
                         *key_state.add([
-                            SDL_Scancode::SDL_SCANCODE_X,      // A
-                            SDL_Scancode::SDL_SCANCODE_Z,      // B
-                            SDL_Scancode::SDL_SCANCODE_TAB,    // Select
-                            SDL_Scancode::SDL_SCANCODE_RETURN, // Start
-                            SDL_Scancode::SDL_SCANCODE_UP,     // Dpad Up
-                            SDL_Scancode::SDL_SCANCODE_DOWN,   // Dpad Down
-                            SDL_Scancode::SDL_SCANCODE_LEFT,   // Dpad Left
-                            SDL_Scancode::SDL_SCANCODE_RIGHT,  // Dpad Right
+                            sdl::SDL_Scancode::SDL_SCANCODE_X,      // A
+                            sdl::SDL_Scancode::SDL_SCANCODE_Z,      // B
+                            sdl::SDL_Scancode::SDL_SCANCODE_TAB,    // Select
+                            sdl::SDL_Scancode::SDL_SCANCODE_RETURN, // Start
+                            sdl::SDL_Scancode::SDL_SCANCODE_UP,     // Dpad Up
+                            sdl::SDL_Scancode::SDL_SCANCODE_DOWN,   // Dpad Down
+                            sdl::SDL_Scancode::SDL_SCANCODE_LEFT,   // Dpad Left
+                            sdl::SDL_Scancode::SDL_SCANCODE_RIGHT,  // Dpad Right
                         ][hi as usize] as usize);
                 }
                 if lo == 22 {
@@ -585,17 +570,16 @@ fn main() {
         }
 
         // Convert Rust string to C string
-        let c_filename = std::ffi::CString::new(args[1].as_str()).unwrap();
-        let rw = SDL_RWFromFile(c_filename.as_ptr(), std::ffi::CString::new("rb").unwrap().as_ptr());
+        let c_filename = CString::new(args[1].as_str()).unwrap();
+        let rw = sdl::SDL_RWFromFile(c_filename.as_ptr(), CString::new("rb").unwrap().as_ptr());
         if rw.is_null() {
-            use sdl2_sys::SDL_GetError;
-            let err = SDL_GetError();
+            let err = sdl::SDL_GetError();
             panic!(
                 "SDL_RWFromFile failed: {}",
                 std::ffi::CStr::from_ptr(err).to_string_lossy()
             );
         }
-        SDL_RWread(rw, rombuf.as_mut_ptr() as *mut c_void, 1024 * 1024, 1);
+        sdl::SDL_RWread(rw, rombuf.as_mut_ptr() as *mut c_void, 1024 * 1024, 1);
         
         // Start PRG0 after 16-byte header.
         rom = rombuf.as_ptr().wrapping_add(16);
@@ -623,17 +607,23 @@ fn main() {
         PCL = mem(!3, !0, 0, 0);
         PCH = mem(!2, !0, 0, 0);
 
-        sdl2_sys::SDL_Init(SDL_INIT_VIDEO);
+        sdl::SDL_Init(sdl::SDL_INIT_VIDEO);
 
-        key_state = sdl2_sys::SDL_GetKeyboardState(std::ptr::null_mut()) as *mut u8;
+        key_state = sdl::SDL_GetKeyboardState(std::ptr::null_mut()) as *mut u8;
         // Create window 1024x840. The framebuffer is 256x240, but we don't draw the
         // top or bottom 8 rows. Scaling up by 4x gives 1024x960, but that looks
         // squished because the NES doesn't have square pixels. So shrink it by 7/8.
-        let renderer = SDL_CreateRenderer(
-            SDL_CreateWindow("smolnes".as_ptr() as *const i8, 0, 0, 1024, 840, SDL_WINDOW_SHOWN as u32), -1,
-            SDL_RENDERER_PRESENTVSYNC as u32);
-        let texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR565 as u32,
-                                            SDL_TEXTUREACCESS_STREAMING as i32, 256, 224);
+        let renderer = sdl::SDL_CreateRenderer(
+            sdl::SDL_CreateWindow("smolnes".as_ptr() as *const i8, 
+            0, 0, 1024, 840,
+            sdl::SDL_WindowFlags::SDL_WINDOW_SHOWN as u32), -1,
+            sdl::SDL_RendererFlags::SDL_RENDERER_PRESENTVSYNC as u32);
+        let texture = sdl::SDL_CreateTexture(
+            renderer,
+            sdl::SDL_PixelFormatEnum::SDL_PIXELFORMAT_BGR565 as u32,
+            sdl::SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING as i32,
+            256,
+            224);
 
         loop {
             nomem = 0;
@@ -1003,13 +993,13 @@ fn main() {
                         ppustatus |= 128;
                         // Render frame, skipping the top and bottom 8 pixels (they're often
                         // garbage).
-                        SDL_UpdateTexture(texture, std::ptr::null(), frame_buffer.as_ptr().add(2048) as *const c_void, 512);
-                        SDL_RenderCopy(renderer, texture, std::ptr::null(), std::ptr::null());
-                        SDL_RenderPresent(renderer);
+                        sdl::SDL_UpdateTexture(texture, std::ptr::null(), frame_buffer.as_ptr().add(2048) as *const c_void, 512);
+                        sdl::SDL_RenderCopy(renderer, texture, std::ptr::null(), std::ptr::null());
+                        sdl::SDL_RenderPresent(renderer);
                         // Handle SDL events.
-                        let mut event: SDL_Event = std::mem::zeroed();
-                        while SDL_PollEvent(&mut event) != 0 {
-                            if event.type_ == SDL_QUIT as u32 {
+                        let mut event: sdl::SDL_Event = std::mem::zeroed();
+                        while sdl::SDL_PollEvent(&mut event) != 0 {
+                            if event.type_ == sdl::SDL_EventType::SDL_QUIT as u32 {
                                 return;
                             }
                         }
